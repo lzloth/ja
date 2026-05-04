@@ -1,0 +1,483 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Target Crop Tool</title>
+<style>
+  :root {
+    --bg: #f7f6f2;
+    --surface: #ffffff;
+    --border: #e2e0d8;
+    --border2: #c8c5bb;
+    --text: #1a1917;
+    --text2: #6b6860;
+    --text3: #9e9b93;
+    --JA: #185FA5; --JA-bg: #E6F1FB; --JA-border: #B5D4F4;
+    --OP: #0F6E56; --OP-bg: #E1F5EE; --OP-border: #9FE1CB;
+    --OO: #993C1D; --OO-bg: #FAECE7; --OO-border: #F5C4B3;
+    --green: #1D9E75; --red: #D85A30;
+    --radius: 8px; --radius-lg: 12px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: 'Georgia', serif; min-height: 100vh; }
+
+  .page { max-width: 780px; margin: 0 auto; padding: 2.5rem 1.5rem 4rem; }
+
+  header { margin-bottom: 2rem; padding-bottom: 1.25rem; border-bottom: 1px solid var(--border); }
+  header h1 { font-size: 1.35rem; font-weight: normal; letter-spacing: -0.01em; color: var(--text); }
+  header p  { font-size: 0.8rem; color: var(--text3); margin-top: 4px; font-family: 'Courier New', monospace; }
+
+  section { margin-bottom: 1.75rem; }
+  .section-label { font-size: 0.7rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text3); font-family: 'Courier New', monospace; margin-bottom: 0.6rem; }
+
+  /* cat buttons */
+  .cat-row { display: flex; gap: 8px; flex-wrap: wrap; }
+  .cat-btn {
+    font-size: 0.8rem; padding: 6px 20px; border-radius: var(--radius);
+    border: 1.5px solid var(--border2); background: var(--surface);
+    color: var(--text2); cursor: pointer; font-family: 'Courier New', monospace;
+    letter-spacing: 0.05em; transition: all 0.12s;
+  }
+  .cat-btn:hover { border-color: var(--text2); color: var(--text); }
+  .cat-btn.active-JA { border-color: var(--JA); background: var(--JA-bg); color: var(--JA); font-weight: bold; }
+  .cat-btn.active-OP { border-color: var(--OP); background: var(--OP-bg); color: var(--OP); font-weight: bold; }
+  .cat-btn.active-OO { border-color: var(--OO); background: var(--OO-bg); color: var(--OO); font-weight: bold; }
+
+  /* tracker */
+  .tracker { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); overflow: hidden; }
+  .tr-head { display: grid; grid-template-columns: 56px 1fr 1fr 48px 64px; gap: 8px; padding: 7px 14px; background: var(--bg); border-bottom: 1px solid var(--border); font-size: 0.68rem; color: var(--text3); font-family: 'Courier New', monospace; letter-spacing: 0.04em; }
+  .tr-row  { display: grid; grid-template-columns: 56px 1fr 1fr 48px 64px; gap: 8px; padding: 9px 14px; border-bottom: 1px solid var(--border); align-items: center; }
+  .tr-foot { display: grid; grid-template-columns: 56px 1fr 1fr 48px 64px; gap: 8px; padding: 7px 14px; background: var(--bg); font-size: 0.75rem; font-family: 'Courier New', monospace; color: var(--text2); }
+  .tr-row:last-of-type { border-bottom: none; }
+  .tr-cat { font-size: 0.8rem; font-family: 'Courier New', monospace; font-weight: bold; }
+  .tr-num { font-size: 0.85rem; }
+  .bar-wrap { height: 3px; background: var(--bg); border-radius: 2px; margin-top: 4px; }
+  .bar-o { height: 3px; background: var(--green); border-radius: 2px; transition: width 0.35s; }
+  .bar-x { height: 3px; background: var(--red);   border-radius: 2px; transition: width 0.35s; }
+  .tr-prog { font-size: 0.72rem; color: var(--text3); font-family: 'Courier New', monospace; text-align: right; }
+
+  /* dropzone */
+  #dropzone {
+    border: 1.5px dashed var(--border2); border-radius: var(--radius-lg);
+    padding: 2.5rem 2rem; text-align: center; cursor: pointer;
+    color: var(--text3); font-size: 0.85rem; transition: all 0.15s;
+    background: var(--surface);
+  }
+  #dropzone:hover { border-color: var(--text2); color: var(--text2); background: var(--bg); }
+  #dropzone.off { opacity: 0.4; pointer-events: none; }
+  #dropzone small { display: block; margin-top: 6px; font-size: 0.72rem; font-family: 'Courier New', monospace; color: var(--text3); }
+
+  /* canvas */
+  #cvwrap { display: none; }
+  .cv-meta { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 8px; }
+  .badge { font-size: 0.7rem; padding: 3px 10px; border-radius: 4px; font-family: 'Courier New', monospace; border: 1px solid var(--border); background: var(--bg); color: var(--text2); }
+  .badge-JA { background: var(--JA-bg); color: var(--JA); border-color: var(--JA-border); }
+  .badge-OP { background: var(--OP-bg); color: var(--OP); border-color: var(--OP-border); }
+  .badge-OO { background: var(--OO-bg); color: var(--OO); border-color: var(--OO-border); }
+  .badge-ok { background: #E1F5EE; color: #085041; border-color: #9FE1CB; }
+  #canvas-hint { font-size: 0.78rem; color: var(--text3); margin-bottom: 8px; font-family: 'Courier New', monospace; }
+  #main-canvas { display: block; width: 100%; cursor: crosshair; border-radius: var(--radius); border: 1px solid var(--border); }
+
+  /* preview */
+  #pvwrap { display: none; margin-top: 1.25rem; }
+  #preview-canvas { border: 1px solid var(--border); border-radius: var(--radius); max-width: 200px; display: block; }
+  .coord-row { margin-top: 8px; }
+
+  /* attention */
+  .att-section { margin-top: 1rem; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .att-label { font-size: 0.72rem; color: var(--text3); font-family: 'Courier New', monospace; letter-spacing: 0.05em; text-transform: uppercase; }
+  .att-btn {
+    font-size: 0.8rem; padding: 6px 18px; border-radius: var(--radius);
+    border: 1.5px solid var(--border2); background: var(--surface);
+    color: var(--text2); cursor: pointer; font-family: 'Courier New', monospace; transition: all 0.12s;
+  }
+  .att-btn:hover { border-color: var(--text2); }
+  .att-btn.ay { border-color: var(--OP); background: var(--OP-bg); color: var(--OP); font-weight: bold; }
+  .att-btn.an { border-color: var(--OO); background: var(--OO-bg); color: var(--OO); font-weight: bold; }
+  #awarn { font-size: 0.72rem; color: var(--OO); font-family: 'Courier New', monospace; display: none; }
+
+  /* action buttons */
+  .btn-row { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 1rem; }
+  .btn {
+    font-size: 0.8rem; padding: 7px 18px; border-radius: var(--radius);
+    border: 1px solid var(--border2); background: var(--surface);
+    color: var(--text); cursor: pointer; font-family: 'Courier New', monospace;
+    transition: all 0.12s; letter-spacing: 0.02em;
+  }
+  .btn:hover { background: var(--bg); border-color: var(--text2); }
+  .btn.primary { background: var(--text); color: var(--surface); border-color: var(--text); }
+  .btn.primary:hover { opacity: 0.85; }
+
+  /* csv buttons */
+  .csv-row { display: flex; gap: 8px; flex-wrap: wrap; }
+
+  /* log */
+  #logwrap { display: none; }
+  #log {
+    font-size: 0.7rem; font-family: 'Courier New', monospace;
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 0.75rem 1rem;
+    max-height: 120px; overflow-y: auto; color: var(--text2);
+    line-height: 1.8;
+  }
+
+  /* divider */
+  .divider { border: none; border-top: 1px solid var(--border); margin: 1.75rem 0; }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <header>
+    <h1>Target Crop Tool</h1>
+    <p>visual search experiment · stimulus preparation</p>
+  </header>
+
+  <!-- 카테고리 -->
+  <section>
+    <div class="section-label">① Category</div>
+    <div class="cat-row">
+      <button class="cat-btn" id="cat-JA" onclick="selCat('JA')">JA</button>
+      <button class="cat-btn" id="cat-OP" onclick="selCat('OP')">OP</button>
+      <button class="cat-btn" id="cat-OO" onclick="selCat('OO')">OO</button>
+    </div>
+  </section>
+
+  <!-- 트래커 -->
+  <section>
+    <div class="section-label">Progress</div>
+    <div class="tracker">
+      <div class="tr-head">
+        <span></span><span>attention o</span><span>attention x</span><span style="text-align:right">total</span><span style="text-align:right">done</span>
+      </div>
+      <div class="tr-row">
+        <span class="tr-cat" style="color:var(--JA)">JA</span>
+        <div><span class="tr-num" id="jo">0</span><div class="bar-wrap"><div class="bar-o" id="bjo" style="width:0%"></div></div></div>
+        <div><span class="tr-num" id="jx">0</span><div class="bar-wrap"><div class="bar-x" id="bjx" style="width:0%"></div></div></div>
+        <span class="tr-num" style="text-align:right;font-family:'Courier New',monospace" id="jt">0</span>
+        <span class="tr-prog" id="jp">—</span>
+      </div>
+      <div class="tr-row">
+        <span class="tr-cat" style="color:var(--OP)">OP</span>
+        <div><span class="tr-num" id="oo">0</span><div class="bar-wrap"><div class="bar-o" id="boo" style="width:0%"></div></div></div>
+        <div><span class="tr-num" id="ox">0</span><div class="bar-wrap"><div class="bar-x" id="box" style="width:0%"></div></div></div>
+        <span class="tr-num" style="text-align:right;font-family:'Courier New',monospace" id="ot">0</span>
+        <span class="tr-prog" id="opr">—</span>
+      </div>
+      <div class="tr-row">
+        <span class="tr-cat" style="color:var(--OO)">OO</span>
+        <div><span class="tr-num" id="qo">0</span><div class="bar-wrap"><div class="bar-o" id="bqo" style="width:0%"></div></div></div>
+        <div><span class="tr-num" id="qx">0</span><div class="bar-wrap"><div class="bar-x" id="bqx" style="width:0%"></div></div></div>
+        <span class="tr-num" style="text-align:right;font-family:'Courier New',monospace" id="qt">0</span>
+        <span class="tr-prog" id="qp">—</span>
+      </div>
+      <div class="tr-foot">
+        <span>total</span>
+        <span id="go">0</span>
+        <span id="gx">0</span>
+        <span style="text-align:right" id="gt">0</span>
+        <span></span>
+      </div>
+    </div>
+  </section>
+
+  <hr class="divider">
+
+  <!-- 업로드 -->
+  <section>
+    <div class="section-label">② Upload images</div>
+    <div id="dropzone" class="off" onclick="document.getElementById('fi').click()">
+      클릭하거나 이미지를 여기에 드래그해서 올려줘
+      <small>jpg · png · 여러 장 한 번에 가능</small>
+    </div>
+    <input type="file" id="fi" accept="image/*" multiple style="display:none">
+  </section>
+
+  <!-- 캔버스 -->
+  <section id="cvwrap">
+    <div class="section-label">③ Drag to select target</div>
+    <div class="cv-meta">
+      <span id="sname" style="font-size:0.82rem;font-weight:bold;color:var(--text)"></span>
+      <span id="scnt" class="badge"></span>
+      <span id="scatbadge" class="badge"></span>
+    </div>
+    <p id="canvas-hint">마우스로 드래그해서 타겟 영역을 선택해줘</p>
+    <canvas id="main-canvas"></canvas>
+
+    <!-- 미리보기 -->
+    <div id="pvwrap">
+      <div class="section-label" style="margin-top:1rem">Crop preview</div>
+      <canvas id="preview-canvas"></canvas>
+      <div class="coord-row"><span id="cbadge" class="badge"></span></div>
+
+      <!-- attention -->
+      <div class="att-section">
+        <span class="att-label">④ Attention</span>
+        <button class="att-btn" id="ayes" onclick="selAtt(true)">O &nbsp;있음</button>
+        <button class="att-btn" id="ano"  onclick="selAtt(false)">X &nbsp;없음</button>
+        <span id="awarn">← 선택해줘!</span>
+      </div>
+
+      <!-- 버튼들 -->
+      <div class="btn-row">
+        <button class="btn primary" id="bsave" onclick="saveCrop()">이 크롭 저장</button>
+        <button class="btn" id="bnext" onclick="nextImg()">다음 이미지 →</button>
+        <button class="btn" id="bredo" onclick="redo()">다시 선택</button>
+      </div>
+    </div>
+  </section>
+
+  <hr class="divider">
+
+  <!-- CSV -->
+  <section>
+    <div class="section-label">CSV download</div>
+    <div class="csv-row">
+      <button class="btn primary" onclick="dlCSV('all')">전체 CSV</button>
+      <button class="btn" onclick="dlCSV('JA')">JA</button>
+      <button class="btn" onclick="dlCSV('OP')">OP</button>
+      <button class="btn" onclick="dlCSV('OO')">OO</button>
+    </div>
+  </section>
+
+  <!-- 로그 -->
+  <section id="logwrap">
+    <div class="section-label">Log</div>
+    <div id="log"></div>
+  </section>
+
+</div>
+
+<script>
+var S = {
+  files: [], idx: 0, img: null, scale: 1,
+  drag: false, sx: 0, sy: 0, ex: 0, ey: 0,
+  hasCrop: false, records: [], blob: null,
+  cat: null, att: null,
+  fcounts: { JA: 0, OP: 0, OO: 0 }
+};
+
+var mc   = document.getElementById('main-canvas');
+var ctx  = mc.getContext('2d');
+var pc   = document.getElementById('preview-canvas');
+var pctx = pc.getContext('2d');
+var dz   = document.getElementById('dropzone');
+
+function selCat(c) {
+  S.cat = c;
+  var cats = ['JA', 'OP', 'OO'];
+  for (var i = 0; i < cats.length; i++) {
+    document.getElementById('cat-' + cats[i]).className = 'cat-btn' + (cats[i] === c ? ' active-' + c : '');
+  }
+  dz.className = '';
+  dz.innerHTML = '클릭하거나 이미지를 여기에 드래그해서 올려줘 <small>' + c + ' · jpg · png · 여러 장 한 번에 가능</small>';
+}
+
+function selAtt(v) {
+  S.att = v;
+  document.getElementById('ayes').className = 'att-btn' + (v === true  ? ' ay' : '');
+  document.getElementById('ano').className  = 'att-btn' + (v === false ? ' an' : '');
+  document.getElementById('awarn').style.display = 'none';
+}
+
+document.getElementById('fi').addEventListener('change', function(e) { go(e.target.files); });
+dz.addEventListener('dragover',  function(e) { e.preventDefault(); dz.style.background = '#efede7'; });
+dz.addEventListener('dragleave', function()  { dz.style.background = ''; });
+dz.addEventListener('drop', function(e) {
+  e.preventDefault(); dz.style.background = '';
+  if (!S.cat) return;
+  go(e.dataTransfer.files);
+});
+
+function go(files) {
+  var arr = [];
+  for (var i = 0; i < files.length; i++) arr.push(files[i]);
+  arr.sort(function(a, b) { return a.name < b.name ? -1 : 1; });
+  S.files = arr; S.idx = 0;
+  S.fcounts[S.cat] = arr.length;
+  tick(); loadImg();
+}
+
+function loadImg() {
+  if (S.idx >= S.files.length) { done(); return; }
+  var f = S.files[S.idx];
+  document.getElementById('sname').textContent = f.name;
+  document.getElementById('scnt').textContent  = (S.idx + 1) + ' / ' + S.files.length;
+  var cb = document.getElementById('scatbadge');
+  cb.textContent = S.cat; cb.className = 'badge badge-' + S.cat;
+  var img = new Image();
+  img.onload = function() {
+    S.img = img;
+    var maxW = mc.parentElement.clientWidth || 700;
+    S.scale  = Math.min(1, maxW / img.naturalWidth);
+    mc.width  = Math.round(img.naturalWidth  * S.scale);
+    mc.height = Math.round(img.naturalHeight * S.scale);
+    draw();
+    document.getElementById('cvwrap').style.display = 'block';
+    document.getElementById('pvwrap').style.display = 'none';
+    S.hasCrop = false; S.att = null;
+    document.getElementById('ayes').className = 'att-btn';
+    document.getElementById('ano').className  = 'att-btn';
+    document.getElementById('awarn').style.display = 'none';
+    dz.style.display = 'none';
+  };
+  img.src = URL.createObjectURL(f);
+}
+
+function draw() {
+  ctx.clearRect(0, 0, mc.width, mc.height);
+  ctx.drawImage(S.img, 0, 0, mc.width, mc.height);
+  if (S.drag || S.hasCrop) {
+    var x = Math.min(S.sx, S.ex), y = Math.min(S.sy, S.ey);
+    var w = Math.abs(S.ex - S.sx), h = Math.abs(S.ey - S.sy);
+    ctx.fillStyle = 'rgba(0,0,0,0.38)';
+    ctx.fillRect(0, 0, mc.width, mc.height);
+    ctx.clearRect(x, y, w, h);
+    ctx.drawImage(S.img, x / S.scale, y / S.scale, w / S.scale, h / S.scale, x, y, w, h);
+    ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 1.5;
+    ctx.strokeRect(x, y, w, h);
+  }
+}
+
+function gp(e) {
+  var r  = mc.getBoundingClientRect();
+  var sx = mc.width  / r.width;
+  var sy = mc.height / r.height;
+  var src = e.touches ? e.touches[0] : e;
+  return { x: Math.round((src.clientX - r.left) * sx), y: Math.round((src.clientY - r.top) * sy) };
+}
+
+mc.addEventListener('mousedown', function(e) {
+  var p = gp(e); S.sx = p.x; S.sy = p.y; S.ex = p.x; S.ey = p.y;
+  S.drag = true; S.hasCrop = false;
+  document.getElementById('pvwrap').style.display = 'none';
+});
+mc.addEventListener('mousemove', function(e) {
+  if (!S.drag) return;
+  var p = gp(e); S.ex = p.x; S.ey = p.y; draw();
+});
+mc.addEventListener('mouseup', function(e) {
+  if (!S.drag) return;
+  S.drag = false; var p = gp(e); S.ex = p.x; S.ey = p.y; crop();
+});
+mc.addEventListener('mouseleave', function() {
+  if (S.drag) { S.drag = false; crop(); }
+});
+
+function crop() {
+  if (Math.abs(S.ex - S.sx) < 5 || Math.abs(S.ey - S.sy) < 5) return;
+  S.hasCrop = true; draw();
+  var x = Math.min(S.sx, S.ex), y = Math.min(S.sy, S.ey);
+  var w = Math.abs(S.ex - S.sx), h = Math.abs(S.ey - S.sy);
+  pc.width = w; pc.height = h;
+  pctx.drawImage(mc, x, y, w, h, 0, 0, w, h);
+  document.getElementById('pvwrap').style.display = 'block';
+  var rx = Math.round(x / S.scale), ry = Math.round(y / S.scale);
+  var rw = Math.round(w / S.scale), rh = Math.round(h / S.scale);
+  var cx = Math.round(rx + rw / 2), cy = Math.round(ry + rh / 2);
+  var cb = document.getElementById('cbadge');
+  cb.textContent = '원본 좌표  x=' + cx + '  y=' + cy + '  |  크기 ' + rw + '×' + rh + 'px';
+  cb.className = 'badge badge-ok';
+  var dataURL = pc.toDataURL('image/png');
+  S.blob = dataURL;
+}
+
+function saveCrop() {
+  if (!S.hasCrop || !S.blob) return;
+  if (S.att === null) { document.getElementById('awarn').style.display = 'inline'; return; }
+  var x  = Math.min(S.sx, S.ex),  y  = Math.min(S.sy, S.ey);
+  var w  = Math.abs(S.ex - S.sx), h  = Math.abs(S.ey - S.sy);
+  var rx = Math.round(x / S.scale), ry = Math.round(y / S.scale);
+  var rw = Math.round(w / S.scale), rh = Math.round(h / S.scale);
+  var cx = Math.round(rx + rw / 2), cy = Math.round(ry + rh / 2);
+  var sn = S.files[S.idx].name;
+  var bn = sn.replace(/\.[^.]+$/, '');
+  var tn = 'target_' + bn + '.png';
+
+  var a = document.createElement('a');
+  a.href     = S.blob;
+  a.download = tn;
+  a.click();
+
+  S.records.push({
+    scene_img:  'images/' + sn,
+    target_img: 'images/targets/' + tn,
+    category:   S.cat,
+    attention:  S.att ? 'o' : 'x',
+    target_x:   cx, target_y: cy,
+    target_w:   rw, target_h: rh,
+    correct_ans: 'present'
+  });
+
+  tick();
+  document.getElementById('logwrap').style.display = 'block';
+  var d = document.createElement('div');
+  d.textContent = '✓  [' + S.cat + ']  [att:' + (S.att ? 'o' : 'x') + ']  ' + sn + '  →  x=' + cx + '  y=' + cy;
+  document.getElementById('log').appendChild(d);
+  document.getElementById('log').scrollTop = 9999;
+
+  var btn = document.getElementById('bsave');
+  btn.textContent = '저장됨 ✓';
+  setTimeout(function() { btn.textContent = '이 크롭 저장'; }, 1400);
+}
+
+function nextImg() { S.idx++; S.hasCrop = false; loadImg(); }
+
+function redo() {
+  S.hasCrop = false;
+  document.getElementById('pvwrap').style.display = 'none';
+  draw();
+}
+
+function tick() {
+  var cats = [
+    { k: 'JA', io: 'jo', ix: 'jx', it: 'jt', ip: 'jp',  bo: 'bjo', bx: 'bjx' },
+    { k: 'OP', io: 'oo', ix: 'ox', it: 'ot', ip: 'opr', bo: 'boo', bx: 'box' },
+    { k: 'OO', io: 'qo', ix: 'qx', it: 'qt', ip: 'qp',  bo: 'bqo', bx: 'bqx' }
+  ];
+  var go = 0, gx = 0;
+  for (var i = 0; i < cats.length; i++) {
+    var c = cats[i];
+    var recs  = S.records.filter(function(r) { return r.category === c.k; });
+    var o     = recs.filter(function(r)  { return r.attention === 'o'; }).length;
+    var x     = recs.filter(function(r)  { return r.attention === 'x'; }).length;
+    var t     = o + x;
+    var total = S.fcounts[c.k] || 0;
+    document.getElementById(c.io).textContent = o;
+    document.getElementById(c.ix).textContent = x;
+    document.getElementById(c.it).textContent = t;
+    document.getElementById(c.ip).textContent = total ? (t + '/' + total) : (t || '—');
+    var mx = Math.max(o, x, 1);
+    document.getElementById(c.bo).style.width = Math.round(o / mx * 100) + '%';
+    document.getElementById(c.bx).style.width = Math.round(x / mx * 100) + '%';
+    go += o; gx += x;
+  }
+  document.getElementById('go').textContent = go;
+  document.getElementById('gx').textContent = gx;
+  document.getElementById('gt').textContent = go + gx;
+}
+
+function dlCSV(f) {
+  var rows = f === 'all' ? S.records : S.records.filter(function(r) { return r.category === f; });
+  if (!rows.length) { alert('저장된 ' + f + ' 크롭이 없어!'); return; }
+  var cols = Object.keys(rows[0]);
+  var lines = [cols.join(',')];
+  for (var i = 0; i < rows.length; i++) {
+    lines.push(cols.map(function(c) { return rows[i][c]; }).join(','));
+  }
+  var csv = lines.join('\n');
+  var a = document.createElement('a');
+  a.href     = 'data:text/csv;charset=utf-8,' + encodeURIComponent(csv);
+  a.download = 'conditions_' + f + '.csv';
+  a.click();
+}
+
+function done() {
+  document.getElementById('cvwrap').style.display = 'none';
+  dz.style.display = 'block'; dz.className = '';
+  dz.innerHTML = S.cat + ' 완료!&nbsp; 다음 카테고리 선택 후 이미지 올려줘. <small>또는 CSV 다운로드</small>';
+}
+</script>
+</body>
+</html>
